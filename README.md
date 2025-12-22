@@ -1,7 +1,9 @@
 # Pyannote ONNX Extended
 
 A pure **ONNX Runtime** implementation of the Pyannote Speaker Diarization 3.1 (multi-speaker) pipeline.
+
 This project removes the heavy PyTorch dependency for inference, making it lightweight, fast, and easy to deploy.
+
 Based on the [pyannote-audio](https://github.com/pyannote/pyannote-audio) models and inspired by [pyannote-onnx](https://github.com/pengzhendong/pyannote-onnx).
 
 ## Key Features
@@ -56,8 +58,3 @@ annotation = pipeline(audio_path)
 for turn, _, speaker in annotation.itertracks(yield_label=True):
     print(f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker={speaker}")
 ```
-
-## Credits
-
-*   **Pyannote.audio**: Hervé Bredin - The original state-of-the-art speaker diarization framework.
-*   **Pyannote ONNX**: Peng Zhendong - Original inspiration for ONNX porting (pyannote/segmentation-3.0).
