@@ -1,0 +1,11 @@
+onnxruntime>=1.16.0
+numpy>=1.24.0
+soundfile
+scikit-learn
+pyannote.core
+scipy
+librosa
+huggingface_hub
+torch
+torchaudio
+pyannote.audio
