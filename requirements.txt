@@ -1,6 +1,6 @@
 onnxruntime>=1.16.0
 numpy>=1.24.0
-soundfile
+av>=11
 scikit-learn
 pyannote.core
 scipy

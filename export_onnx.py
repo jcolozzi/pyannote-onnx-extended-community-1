@@ -56,7 +56,7 @@ def export_onnx(use_auth_token=None):
         try:
             embedding_model = pipeline._embedding.model_.resnet
 
-            # Wrapper to keep only the first output
+            # Wrapper to keep only the second output
             class ModelWrapper(torch.nn.Module):
                 def __init__(self, model):
                     super().__init__()

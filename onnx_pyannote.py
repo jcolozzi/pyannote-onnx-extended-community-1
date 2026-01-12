@@ -2,16 +2,17 @@
 #
 # Copyright (c) 2025- Samson Woof
 
+from itertools import permutations
+
 from huggingface_hub import hf_hub_download
 import numpy as np
 import onnxruntime as ort
 import librosa
-from itertools import permutations
 from pyannote.core import Segment, Annotation, Timeline
 from sklearn.cluster import AgglomerativeClustering
 from scipy.spatial.distance import cdist
-import soundfile as sf
-from scipy import signal
+
+from utils.audio import decode_audio
 
 
 class ONNXSpeakerDiarization:
@@ -65,16 +66,11 @@ class ONNXSpeakerDiarization:
         return perms[np.argmin(diffs)]
 
     def __call__(self, audio_path, num_speakers=None):
-        waveform, sr = sf.read(audio_path)
+        waveform = decode_audio(audio_path, self.sample_rate)
 
         # Convert to mono if stereo
         if len(waveform.shape) > 1 and waveform.shape[1] > 1:
             waveform = np.mean(waveform, axis=1)
-
-        # Resample if needed
-        if sr != self.sample_rate:
-            number_of_samples = round(len(waveform) * float(self.sample_rate) / sr)
-            waveform = signal.resample(waveform, number_of_samples)
 
         # 1. Segmentation
         segments = self.run_segmentation(waveform)
@@ -119,7 +115,7 @@ class ONNXSpeakerDiarization:
 
         for i_sample in range(0, len(waveform) - window_samples + 1, step_samples):
             chunk = waveform[i_sample:i_sample+window_samples]
-            chunk = chunk[np.newaxis, np.newaxis, :].astype(np.float32)
+            chunk = chunk[np.newaxis, np.newaxis, :]
 
             out = self.segmentation_session.run(None, {"input_values": chunk})[0][0]
             out = np.exp(out) # (frames, speakers)
@@ -217,7 +213,7 @@ class ONNXSpeakerDiarization:
             log_melspec = np.log(melspec + 1e-6)
             features = log_melspec.T
             features = features - np.mean(features, axis=0)
-            features = features[np.newaxis, :, :].astype(np.float32)
+            features = features[np.newaxis, :, :]
 
             try:
                 emb = self.embedding_session.run(None, {"input_features": features})[0][0]
@@ -237,6 +233,8 @@ class ONNXSpeakerDiarization:
     def cluster_embeddings(self, embeddings, segments, num_speakers=None):
         if len(embeddings) == 0:
             return []
+        elif len(embeddings) == 1:
+            return [0]
 
         # Two-Stage Clustering
         # 1. Cluster long segments (> 2.3s) to find core speakers
