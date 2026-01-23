@@ -25,7 +25,7 @@ class ONNXSpeakerDiarization:
                  offset=0.5,
                  min_duration_on=0.5,
                  min_duration_off=0.3):
-        
+
         if model_name == "speaker-diarization-3.1":
             if segmentation_path is None:
                 segmentation_path = hf_hub_download(
@@ -39,7 +39,7 @@ class ONNXSpeakerDiarization:
                 )
         else:
             raise ValueError(f"Unknown model name: {model_name}")
-        
+
         self.segmentation_session = ort.InferenceSession(
             segmentation_path, providers=providers)
         self.embedding_session = ort.InferenceSession(
@@ -65,12 +65,17 @@ class ONNXSpeakerDiarization:
         diffs = np.sum(np.abs(sum_perms), axis=1)
         return perms[np.argmin(diffs)]
 
-    def __call__(self, audio_path, num_speakers=None):
-        waveform = decode_audio(audio_path, self.sample_rate)
-
-        # Convert to mono if stereo
-        if len(waveform.shape) > 1 and waveform.shape[1] > 1:
-            waveform = np.mean(waveform, axis=1)
+    def __call__(self, audio, num_speakers=None):
+        """
+        Args:
+            audio (str or np.ndarray): Audio path or waveform.
+            num_speakers (int, optional): Number of speakers. Defaults to None.
+        """
+        if isinstance(audio, str):
+            audio_path = audio
+            waveform = decode_audio(audio_path, self.sample_rate)
+        else:
+            waveform = audio
 
         # 1. Segmentation
         segments = self.run_segmentation(waveform)
@@ -237,43 +242,44 @@ class ONNXSpeakerDiarization:
             return [0]
 
         # Two-Stage Clustering
-        # 1. Cluster long segments (> 2.3s) to find core speakers
+        # 1. Cluster long segments to find core speakers
         # 2. Assign short segments to the nearest core speaker
-        min_duration = 2.3
+        duration = sum([s.end - s.start for s in segments])
+        min_duration = np.clip(duration / 60, 2, 5)
         long_indices = [
             i for i, s in enumerate(segments) if (s.end - s.start) >= min_duration]
         short_indices = [
             i for i, s in enumerate(segments) if (s.end - s.start) < min_duration]
-        
+
         # Fallback: if not enough long segments, cluster everything
-        if len(long_indices) < 2:
-            long_indices = list(range(len(embeddings)))
-            short_indices = []
-            
+        if len(long_indices) < 2 or (num_speakers and num_speakers <= 1):
+            return [0] * len(embeddings)
+
         long_embeddings = embeddings[long_indices]
-        
+
         if num_speakers:
             clustering = AgglomerativeClustering(
                 n_clusters=num_speakers, metric='euclidean', linkage='ward')
         else:
+            distance_threshold = max((350 - duration) / 350, 0.73)
             clustering = AgglomerativeClustering(
-                n_clusters=None, distance_threshold=0.7,
-                metric='euclidean', linkage='ward')
+                n_clusters=None, distance_threshold=distance_threshold,
+                metric='euclidean', linkage='single')
 
         clustering.fit(long_embeddings)
         long_labels = clustering.labels_
-        
+
         # Prepare final labels array
         labels = np.zeros(len(embeddings), dtype=int)
         labels[long_indices] = long_labels
-        
+
         # Assign short segments
         if len(short_indices) > 0:
             # Calculate centroids of the found clusters
             unique_labels = np.unique(long_labels)
             centroids = []
             centroid_labels = []
-            
+
             for label in unique_labels:
                 # Get all embeddings belonging to this cluster
                 cluster_emb = long_embeddings[long_labels == label]
@@ -281,17 +287,17 @@ class ONNXSpeakerDiarization:
                 centroid = np.mean(cluster_emb, axis=0)
                 centroids.append(centroid)
                 centroid_labels.append(label)
-                
+
             centroids = np.array(centroids)
-            
+
             # Predict labels for short embeddings based on nearest centroid
             short_embeddings = embeddings[short_indices]
-            
+
             # Calculate distances: (n_short, n_centroids)
             dists = cdist(short_embeddings, centroids, metric='euclidean')
             nearest_centroid_indices = np.argmin(dists, axis=1)
-            
+
             short_labels = [centroid_labels[i] for i in nearest_centroid_indices]
             labels[short_indices] = short_labels
-            
+
         return labels
