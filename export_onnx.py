@@ -8,11 +8,11 @@ def export_onnx(use_auth_token=None):
     # Load the pipeline
     try:
         pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
+            "pyannote/speaker-diarization-community-1",
             use_auth_token=use_auth_token)
     except Exception as e:
         print(f"Error loading pipeline: {e}")
-        print("Please ensure you have accepted the user agreement on Hugging Face (pyannote/speaker-diarization-3.1) and provided your access token.")
+        print("Please ensure you have accepted the user agreement on Hugging Face (pyannote/speaker-diarization-community-1) and provided your access token.")
         return
 
     # Create output directory
@@ -48,7 +48,7 @@ def export_onnx(use_auth_token=None):
 
     print("Exporting Embedding Model...")
     # 2. Export Embedding Model
-    # The pyannote 3.1 pipeline uses wespeaker-resnet34-LM.
+    # The community-1 pipeline uses wespeaker-resnet34-LM.
     # We download the ONNX version from onnx-community.
     
     # Check if pipeline uses standard embedding
