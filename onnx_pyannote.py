@@ -350,14 +350,33 @@ class ONNXSpeakerDiarization:
         if num_speakers:
             clustering = AgglomerativeClustering(
                 n_clusters=num_speakers, metric='euclidean', linkage='ward')
+            clustering.fit(long_embeddings)
+            long_labels = clustering.labels_
         else:
             distance_threshold = max((350 - duration) / 350, 0.73)
             clustering = AgglomerativeClustering(
-                n_clusters=None, distance_threshold=distance_threshold,
-                metric='euclidean', linkage='single')
+                n_clusters=None,
+                distance_threshold=distance_threshold,
+                metric='euclidean',
+                linkage='single',
+            )
+            clustering.fit(long_embeddings)
+            long_labels = clustering.labels_
 
-        clustering.fit(long_embeddings)
-        long_labels = clustering.labels_
+            # Community-1 embeddings can be vulnerable to single-linkage chaining,
+            # which may collapse all speakers into a single cluster.
+            if len(np.unique(long_labels)) <= 1 and len(long_embeddings) >= 4:
+                fallback_threshold = min(distance_threshold + 0.12, 0.90)
+                fallback = AgglomerativeClustering(
+                    n_clusters=None,
+                    distance_threshold=fallback_threshold,
+                    metric='euclidean',
+                    linkage='average',
+                )
+                fallback.fit(long_embeddings)
+                fallback_labels = fallback.labels_
+                if len(np.unique(fallback_labels)) > 1:
+                    long_labels = fallback_labels
 
         # Prepare final labels array
         labels = np.zeros(len(embeddings), dtype=int)
