@@ -11,6 +11,7 @@ setup(
         "numpy>=1.24.0",
         "av>=11",
         "scikit-learn",
+        "huggingface_hub",
         "pyannote.core",
         "scipy",
         "librosa",
