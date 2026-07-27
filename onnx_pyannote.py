@@ -17,7 +17,7 @@ from utils.audio import decode_audio
 
 class ONNXSpeakerDiarization:
     def __init__(self,
-                 model_name="speaker-diarization-3.1",
+                 model_name="speaker-diarization-community-1",
                  segmentation_path=None,
                  embedding_path=None,
                  providers=['CPUExecutionProvider'],
@@ -27,7 +27,7 @@ class ONNXSpeakerDiarization:
                  min_duration_off=0.3,
                  return_exclusive=True):
 
-        if model_name == "speaker-diarization-3.1":
+        if model_name in {"speaker-diarization-community-1", "speaker-diarization-3.1"}:
             if segmentation_path is None:
                 segmentation_path = hf_hub_download(
                     repo_id="onnx-community/pyannote-segmentation-3.0", 

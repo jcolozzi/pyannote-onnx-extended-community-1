@@ -1,6 +1,6 @@
-# Pyannote ONNX Extended
+# Pyannote ONNX Extended Community-1
 
-A pure ONNX Runtime implementation of the pyannote speaker diarization 3.1 style pipeline.
+A pure ONNX Runtime implementation of the pyannote speaker diarization Community-1 style pipeline.
 
 This project removes the heavy PyTorch dependency for inference, making it lightweight, fast, and easy to deploy.
 
@@ -32,7 +32,7 @@ pip install .
 from onnx_pyannote import ONNXSpeakerDiarization
 
 pipeline = ONNXSpeakerDiarization(
-    model_name="speaker-diarization-3.1",
+    model_name="speaker-diarization-community-1",
     providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
     return_exclusive=True,
 )
@@ -62,7 +62,7 @@ You can run with locally converted community-1 compatible artifacts by passing e
 
 ```python
 pipeline = ONNXSpeakerDiarization(
-    model_name="speaker-diarization-3.1",
+    model_name="speaker-diarization-community-1",
     segmentation_path="/path/to/segmentation-community.1.onnx",
     embedding_path="/path/to/wespeaker-voxceleb-resnet34-LM.onnx",
     providers=["CPUExecutionProvider"],
