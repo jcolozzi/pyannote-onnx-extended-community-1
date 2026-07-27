@@ -47,7 +47,8 @@ from onnx_pyannote import ONNXSpeakerDiarization
 # Initialize the pipeline
 pipeline = ONNXSpeakerDiarization(
     model_name="speaker-diarization-3.1",
-    providers=['CUDAExecutionProvider', 'CPUExecutionProvider'] # Use CUDA if available
+    providers=['CUDAExecutionProvider', 'CPUExecutionProvider'], # Use CUDA if available
+    return_exclusive=True,  # default: build exclusive speaker diarization
 )
 
 # Process an audio file
@@ -58,3 +59,8 @@ annotation = pipeline(audio_path)
 for turn, _, speaker in annotation.itertracks(yield_label=True):
     print(f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker={speaker}")
 ```
+
+### Exclusive diarization
+
+`return_exclusive=True` returns an annotation with a single active speaker per time instant.
+Set `return_exclusive=False` to keep the regular overlap-preserving diarization output.

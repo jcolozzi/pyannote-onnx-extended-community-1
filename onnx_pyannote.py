@@ -24,7 +24,8 @@ class ONNXSpeakerDiarization:
                  onset=0.5,
                  offset=0.5,
                  min_duration_on=0.5,
-                 min_duration_off=0.3):
+                 min_duration_off=0.3,
+                 return_exclusive=True):
 
         if model_name == "speaker-diarization-3.1":
             if segmentation_path is None:
@@ -51,6 +52,7 @@ class ONNXSpeakerDiarization:
         self.offset = offset
         self.min_duration_on = min_duration_on
         self.min_duration_off = min_duration_off
+        self.return_exclusive = return_exclusive
 
     @staticmethod
     def sample2frame(sample):
@@ -65,7 +67,77 @@ class ONNXSpeakerDiarization:
         diffs = np.sum(np.abs(sum_perms), axis=1)
         return perms[np.argmin(diffs)]
 
-    def __call__(self, audio, num_speakers=None):
+    @staticmethod
+    def build_exclusive_annotation(annotation):
+        timeline = []
+        for segment, _, speaker in annotation.itertracks(yield_label=True):
+            start = float(segment.start)
+            stop = float(segment.end)
+            if stop <= start:
+                continue
+            timeline.append((start, stop, str(speaker)))
+
+        if not timeline:
+            return Annotation()
+
+        boundaries = sorted({t for start, stop, _ in timeline for t in (start, stop)})
+        if len(boundaries) < 2:
+            return Annotation()
+
+        speaker_order = []
+        for _, _, speaker in timeline:
+            if speaker not in speaker_order:
+                speaker_order.append(speaker)
+
+        exclusive = Annotation()
+        for idx in range(len(boundaries) - 1):
+            sub_start = boundaries[idx]
+            sub_stop = boundaries[idx + 1]
+            if sub_stop <= sub_start:
+                continue
+
+            active = {
+                speaker
+                for start, stop, speaker in timeline
+                if start < sub_stop and stop > sub_start
+            }
+            if not active:
+                continue
+
+            if len(active) == 1:
+                chosen_speaker = next(iter(active))
+            else:
+                overlap_center = (sub_start + sub_stop) / 2.0
+
+                def score(candidate):
+                    covered = sum(
+                        min(sub_stop, stop) - max(sub_start, start)
+                        for start, stop, speaker in timeline
+                        if speaker == candidate and start < sub_stop and stop > sub_start
+                    )
+                    dist = min(
+                        abs(overlap_center - ((start + stop) / 2.0))
+                        for start, stop, speaker in timeline
+                        if speaker == candidate
+                    )
+                    return (covered, -dist)
+
+                sorted_active = sorted(
+                    active,
+                    key=lambda candidate: (
+                        score(candidate)[0],
+                        score(candidate)[1],
+                        -speaker_order.index(candidate),
+                    ),
+                    reverse=True,
+                )
+                chosen_speaker = sorted_active[0]
+
+            exclusive[Segment(sub_start, sub_stop)] = chosen_speaker
+
+        return exclusive.support(collar=0.0)
+
+    def __call__(self, audio, num_speakers=None, return_exclusive=None):
         """
         Args:
             audio (str or np.ndarray): Audio path or waveform.
@@ -94,7 +166,15 @@ class ONNXSpeakerDiarization:
         for segment, label in zip(valid_segments, labels):
             annotation[segment] = f"SPEAKER_{label:02d}"
 
-        return annotation.support() # Merge consecutive segments
+        annotation = annotation.support()  # Merge consecutive segments
+
+        if return_exclusive is None:
+            return_exclusive = self.return_exclusive
+
+        if return_exclusive:
+            return self.build_exclusive_annotation(annotation)
+
+        return annotation
 
     def run_segmentation(self, waveform):
         # Sliding window segmentation
