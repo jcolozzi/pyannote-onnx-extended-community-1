@@ -5,6 +5,7 @@ setup(
     version="0.1.0",
     description="A pure ONNX Runtime implementation of Pyannote Speaker Diarization 3.1",
     author="User",
+    packages=find_packages(),
     py_modules=["onnx_pyannote"],
     install_requires=[
         "onnxruntime>=1.16.0",
