@@ -45,6 +45,10 @@ class ONNXSpeakerDiarization:
             segmentation_path, providers=providers)
         self.embedding_session = ort.InferenceSession(
             embedding_path, providers=providers)
+        self.segmentation_input_name = self.segmentation_session.get_inputs()[0].name
+        self.segmentation_output_name = self.segmentation_session.get_outputs()[0].name
+        self.embedding_input_name = self.embedding_session.get_inputs()[0].name
+        self.embedding_output_name = self.embedding_session.get_outputs()[0].name
         self.sample_rate = 16000
         self.duration = 10.0 # Segmentation model duration
         self.step = 0.5 * self.duration # 50% overlap
@@ -202,7 +206,10 @@ class ONNXSpeakerDiarization:
             chunk = waveform[i_sample:i_sample+window_samples]
             chunk = chunk[np.newaxis, np.newaxis, :]
 
-            out = self.segmentation_session.run(None, {"input_values": chunk})[0][0]
+            out = self.segmentation_session.run(
+                [self.segmentation_output_name],
+                {self.segmentation_input_name: chunk},
+            )[0][0]
             out = np.exp(out) # (frames, speakers)
 
             # Get speech probability
@@ -301,7 +308,10 @@ class ONNXSpeakerDiarization:
             features = features[np.newaxis, :, :]
 
             try:
-                emb = self.embedding_session.run(None, {"input_features": features})[0][0]
+                emb = self.embedding_session.run(
+                    [self.embedding_output_name],
+                    {self.embedding_input_name: features},
+                )[0][0]
 
                 # Normalize embedding (L2 norm) - Important for Cosine Distance
                 norm = np.linalg.norm(emb)
